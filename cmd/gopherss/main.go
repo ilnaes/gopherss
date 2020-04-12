@@ -2,20 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/mmcdole/gofeed"
-	"io/ioutil"
+	c "github.com/ilnaes/gopherss/internal"
+	"os"
 )
 
 func main() {
-	dat, e := ioutil.ReadFile("fm.xml")
-	if e != nil {
-		fmt.Println("Could not read file!")
-		panic(e)
+	if len(os.Args) == 1 {
+		fmt.Println("Need an argument!")
+	} else {
+		c.Run(os.Args[1])
 	}
-
-	fp := gofeed.NewParser()
-
-	feed, e := fp.ParseString(string(dat))
-
-	fmt.Printf("%+v\n", feed)
 }
