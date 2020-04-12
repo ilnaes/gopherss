@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"github.com/mmcdole/gofeed"
 	"io/ioutil"
 	"time"
@@ -16,21 +17,41 @@ type feed struct {
 }
 
 type item struct {
-	Title     string
-	Link      string
-	Author    string
-	Published *time.Time
+	Title       string
+	Link        string
+	Author      string
+	Description string
+	Published   *time.Time
+	Save        bool
+	Deleted     bool
+	Read        bool
 }
 
 func itemFrom(gi *gofeed.Item) *item {
 	return &item{
-		Title:     gi.Title,
-		Link:      gi.Link,
-		Author:    gi.Author.Name,
-		Published: gi.PublishedParsed,
+		Title:       gi.Title,
+		Link:        gi.Link,
+		Author:      gi.Author.Name,
+		Published:   gi.PublishedParsed,
+		Description: gi.Description,
 	}
 }
 
+// creates a new feed from provided URL
+func feedFromURL(s string) (*feed, error) {
+	f := feed{
+		FeedLink: s,
+	}
+
+	err := f.refresh()
+	if err != nil {
+		return nil, err
+	}
+
+	return &f, nil
+}
+
+// refreshes content
 func (f *feed) refresh() error {
 	fp := gofeed.NewParser()
 
@@ -56,15 +77,11 @@ func (f *feed) refresh() error {
 	return nil
 }
 
-func feedFromURL(s string) (*feed, error) {
-	f := feed{
-		FeedLink: s,
-	}
-
-	err := f.refresh()
+func (f *feed) String() string {
+	ppjs, err := json.MarshalIndent(f, "", "	")
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	return &f, nil
+	return string(ppjs)
 }
