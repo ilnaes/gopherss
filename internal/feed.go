@@ -1,87 +1,124 @@
 package internal
 
 import (
-	"encoding/json"
-	"github.com/mmcdole/gofeed"
 	"io/ioutil"
-	"time"
+	"sync"
+
+	"github.com/mmcdole/gofeed"
 )
 
-type feed struct {
+type Feed struct {
+	mu          *sync.Mutex
 	FeedLink    string
 	Title       string
 	Link        string
 	Description string
 	LastDate    string
-	Items       []*item
+	Items       []*Item
 }
 
-type item struct {
-	Title       string
-	Link        string
-	Author      string
-	Description string
-	Published   *time.Time
-	Save        bool
-	Deleted     bool
-	Read        bool
-}
+// feed from url
+func feedFromURL(url string) (*Feed, error) {
+	fp := gofeed.NewParser()
 
-func itemFrom(gi *gofeed.Item) *item {
-	return &item{
-		Title:       gi.Title,
-		Link:        gi.Link,
-		Author:      gi.Author.Name,
-		Published:   gi.PublishedParsed,
-		Description: gi.Description,
-	}
-}
-
-// creates a new feed from provided URL
-func feedFromURL(s string) (*feed, error) {
-	f := feed{
-		FeedLink: s,
-	}
-
-	err := f.refresh()
+	gf, err := fp.ParseURL(url)
 	if err != nil {
 		return nil, err
 	}
 
-	return &f, nil
+	return fromGofeed(gf), nil
 }
 
-// refreshes content
-func (f *feed) refresh() error {
+func feedFromStr(s string) (*Feed, error) {
 	fp := gofeed.NewParser()
-
-	// gf, err := fp.ParseURL(f.FeedLink)
-	dat, err := ioutil.ReadFile(f.FeedLink)
-	gf, err := fp.ParseString(string(dat))
+	gf, err := fp.ParseString(s)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	items := make([]*item, 0)
+	return fromGofeed(gf), nil
+}
 
+// feed from xml file
+func feedFromFile(file string) (*Feed, error) {
+	dat, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return feedFromStr(string(dat))
+}
+
+// project gofeed.Feed onto Feed
+func fromGofeed(gf *gofeed.Feed) *Feed {
+	items := make([]*Item, 0)
 	for _, i := range gf.Items {
 		items = append(items, itemFrom(i))
 	}
 
-	f.Title = gf.Title
-	f.Link = gf.Link
-	f.Description = gf.Description
-	f.LastDate = gf.Updated
-	f.Items = items
+	f := Feed{
+		mu:          &sync.Mutex{},
+		FeedLink:    gf.FeedLink,
+		Title:       gf.Title,
+		Link:        gf.Link,
+		Description: gf.Description,
+		LastDate:    gf.Updated,
+		Items:       items,
+	}
+	return &f
+}
 
+// merges the new feed nf into current feed
+// note: assumes nf is transitory so no need to lock it
+func (f *Feed) merge(nf *Feed) {
+	Items := make([]*Item, 0)
+
+	l := len(nf.Items)
+	// Items are in chronological ascending order
+	for i := range nf.Items {
+		Items = append(Items, nf.Items[l-i-1])
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.Title = nf.Title
+	f.Link = nf.Link
+	f.Description = nf.Description
+	f.LastDate = nf.LastDate
+
+	// append only Items that come later
+	if f.Items == nil || len(f.Items) == 0 {
+		f.Items = Items
+	} else {
+		last := f.Items[len(f.Items)-1].PubDate
+
+		for i := range Items {
+			if last.Before(*Items[i].PubDate) {
+				f.Items = append(f.Items, Items[i:]...)
+				break
+			}
+		}
+	}
+}
+
+// get new items
+func (f *Feed) update() error {
+	nf, err := feedFromURL(f.FeedLink)
+	if err != nil {
+		return err
+	}
+
+	f.merge(nf)
 	return nil
 }
 
-func (f *feed) String() string {
-	ppjs, err := json.MarshalIndent(f, "", "	")
+func (f *Feed) updateFromStr(s string) error {
+	nf, err := feedFromStr(s)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	return string(ppjs)
+	f.merge(nf)
+	return nil
 }

@@ -7,7 +7,7 @@ MAIN_PATH=cmd/$(BINARY_NAME)/main.go
 
 all: test build
 build: 
-		$(GOBUILD) -o $(BINARY_NAME) -v $(MAIN_PATH)
+		$(GOBUILD) -o $(BINARY_NAME) $(MAIN_PATH)
 test: 
 		$(GOTEST) -v ./...
 clean: 

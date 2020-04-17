@@ -8,39 +8,42 @@ import (
 	"strings"
 )
 
-type client struct {
-	Feeds []*feed
-}
-
 func Run(f string) {
 	if strings.Contains(f, "xml") {
-		c := client{
-			Feeds: make([]*feed, 0),
-		}
+		c := newClient()
 
-		feed, err := feedFromURL(f)
+		feed, err := feedFromFile(f)
 		if err != nil {
 			panic(err)
 		}
 
 		c.Feeds = append(c.Feeds, feed)
 
-		ppjs, err := json.MarshalIndent(c, "", "  ")
-		fmt.Println(string(ppjs))
-
 		file, err := os.Create("fm.json")
+		if err != nil {
+			panic(err)
+		}
 		defer file.Close()
 
+		ppjs, err := json.MarshalIndent(c, "", "  ")
+		if err != nil {
+			panic(err)
+		}
+
 		file.Write(ppjs)
+
+		t := tui{}
+		t.start()
+
 	} else {
 		dat, err := ioutil.ReadFile(f)
 		if err != nil {
 			panic(err)
 		}
 
-		var c client
+		var c Client
 		json.Unmarshal(dat, &c)
 
-		fmt.Println(c)
+		fmt.Println(c.Feeds[0].Items[0].Description)
 	}
 }
