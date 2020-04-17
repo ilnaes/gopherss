@@ -10,14 +10,17 @@ import (
 
 func Run(f string) {
 	if strings.Contains(f, "xml") {
-		c := newClient()
-
 		feed, err := feedFromFile(f)
 		if err != nil {
 			panic(err)
 		}
 
-		c.Feeds = append(c.Feeds, feed)
+		cl := newClient()
+		t := Tui{
+			model: &cl,
+		}
+
+		cl.Feeds = append(cl.Feeds, feed)
 
 		file, err := os.Create("fm.json")
 		if err != nil {
@@ -25,16 +28,15 @@ func Run(f string) {
 		}
 		defer file.Close()
 
-		ppjs, err := json.MarshalIndent(c, "", "  ")
+		ppjs, err := json.MarshalIndent(cl, "", "  ")
 		if err != nil {
 			panic(err)
 		}
 
 		file.Write(ppjs)
 
-		t := tui{}
+		go cl.reload()
 		t.start()
-
 	} else {
 		dat, err := ioutil.ReadFile(f)
 		if err != nil {
