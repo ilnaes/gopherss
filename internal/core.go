@@ -22,22 +22,24 @@ func Run(f string) {
 
 		cl.Feeds = append(cl.Feeds, feed)
 
+		go cl.reload()
+		t.start()
+		// <-time.Tick(6 * time.Second)
+
 		file, err := os.Create("fm.json")
 		if err != nil {
 			panic(err)
 		}
 		defer file.Close()
 
-		ppjs, err := json.MarshalIndent(cl, "", "  ")
+		ppjs, err := json.MarshalIndent(cl.Feeds, "", "  ")
 		if err != nil {
 			panic(err)
 		}
 
 		file.Write(ppjs)
 
-		go cl.reload()
-		t.start()
-	} else {
+	} else if strings.Contains(f, "json") {
 		dat, err := ioutil.ReadFile(f)
 		if err != nil {
 			panic(err)

@@ -81,5 +81,11 @@ func (t *Tui) start() error {
 }
 
 func (t *Tui) render() {
+	items := t.model.getItems()
+	for i := range items {
+		items[i] = fmt.Sprintf("[%d] %s", i, items[i])
+	}
+	t.l.Rows = items
+
 	ui.Render(t.l)
 }

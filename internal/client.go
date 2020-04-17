@@ -83,8 +83,9 @@ func (c *Client) getItems() []string {
 	c.Feeds[0].mu.Lock()
 	defer c.Feeds[0].mu.Unlock()
 
-	for _, i := range c.Feeds[0].Items {
-		items = append(items, i.Title)
+	l := len(c.Feeds[0].Items)
+	for i := range c.Feeds[0].Items {
+		items = append(items, c.Feeds[0].Items[l-i-1].Title)
 	}
 
 	return items

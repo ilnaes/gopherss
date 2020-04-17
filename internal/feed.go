@@ -52,8 +52,10 @@ func feedFromFile(file string) (*Feed, error) {
 // project gofeed.Feed onto Feed
 func fromGofeed(gf *gofeed.Feed) *Feed {
 	items := make([]*Item, 0)
-	for _, i := range gf.Items {
-		items = append(items, itemFrom(i))
+	l := len(gf.Items)
+	// items array should be in reverse chronological order
+	for i := range gf.Items {
+		items = append(items, itemFrom(gf.Items[l-i-1]))
 	}
 
 	f := Feed{
@@ -65,20 +67,18 @@ func fromGofeed(gf *gofeed.Feed) *Feed {
 		LastDate:    gf.Updated,
 		Items:       items,
 	}
+
+	if len(gf.FeedLink) == 0 {
+		if gf.Extensions != nil {
+			f.FeedLink = gf.Extensions["atom"]["link"][0].Attrs["href"]
+		}
+	}
 	return &f
 }
 
 // merges the new feed nf into current feed
 // note: assumes nf is transitory so no need to lock it
 func (f *Feed) merge(nf *Feed) {
-	Items := make([]*Item, 0)
-
-	l := len(nf.Items)
-	// Items are in chronological ascending order
-	for i := range nf.Items {
-		Items = append(Items, nf.Items[l-i-1])
-	}
-
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -89,13 +89,13 @@ func (f *Feed) merge(nf *Feed) {
 
 	// append only Items that come later
 	if f.Items == nil || len(f.Items) == 0 {
-		f.Items = Items
+		f.Items = nf.Items
 	} else {
 		last := f.Items[len(f.Items)-1].PubDate
 
-		for i := range Items {
-			if last.Before(*Items[i].PubDate) {
-				f.Items = append(f.Items, Items[i:]...)
+		for i := range nf.Items {
+			if last.Before(*nf.Items[i].PubDate) {
+				f.Items = append(f.Items, nf.Items[i:]...)
 				break
 			}
 		}
