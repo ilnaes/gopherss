@@ -69,6 +69,7 @@ func fromGofeed(gf *gofeed.Feed) *Feed {
 	}
 
 	if len(gf.FeedLink) == 0 {
+		// TODO: error catch all of this
 		if gf.Extensions != nil {
 			f.FeedLink = gf.Extensions["atom"]["link"][0].Attrs["href"]
 		}
@@ -86,6 +87,10 @@ func (f *Feed) merge(nf *Feed) {
 	f.Link = nf.Link
 	f.Description = nf.Description
 	f.LastDate = nf.LastDate
+
+	if len(nf.FeedLink) != 0 {
+		f.FeedLink = nf.FeedLink
+	}
 
 	// append only Items that come later
 	if f.Items == nil || len(f.Items) == 0 {

@@ -41,3 +41,7 @@ func itemFrom(gi *gofeed.Item) *Item {
 func (it *Item) read() {
 	it.Read = true
 }
+
+func (it *Item) getDescription() string {
+	return htmlParse(it.Description)
+}

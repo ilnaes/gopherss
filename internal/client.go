@@ -2,6 +2,7 @@ package internal
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -16,9 +17,15 @@ const (
 	help
 )
 
+type Route int
+
+const (
+	main Route = iota
+)
+
 type State struct {
-	panel  Panel
-	active bool
+	route  Route
+	active Panel
 }
 
 type Client struct {
@@ -31,12 +38,27 @@ type Client struct {
 
 func newClient() Client {
 	return Client{
-		Feeds:        make([]*Feed, 0),
-		items:        nil,
-		navStack:     make([]State, 0),
+		Feeds: make([]*Feed, 0),
+		items: nil,
+		navStack: []State{
+			{
+				route:  main,
+				active: feeds,
+			},
+		},
 		feedSelected: 0,
 		itemSelected: 0,
 	}
+}
+
+func (c *Client) scrollUp() {
+	if c.itemSelected > 0 {
+		c.itemSelected -= 1
+	}
+}
+
+func (c *Client) scrollDown() {
+	c.itemSelected += 1
 }
 
 func (c *Client) reload() {
@@ -52,10 +74,14 @@ func (c *Client) pushState(s State) {
 	c.navStack = append(c.navStack, s)
 }
 
-func (c *Client) popState(s State) (State, error) {
+func (c *Client) peekState() *State {
+	return &c.navStack[len(c.navStack)-1]
+}
+
+func (c *Client) popState() (State, error) {
 	n := len(c.navStack)
-	if n == 0 {
-		return State{}, errors.New("Empty nav stack")
+	if n == 1 {
+		return State{}, errors.New("Can't pop anymore")
 	}
 
 	res := c.navStack[n-1]
@@ -85,8 +111,20 @@ func (c *Client) getItems() []string {
 
 	l := len(c.Feeds[0].Items)
 	for i := range c.Feeds[0].Items {
-		items = append(items, c.Feeds[0].Items[l-i-1].Title)
+		items = append(items, c.Feeds[0].Items[l-i-1].Title+"  "+
+			strings.Replace(c.Feeds[0].Items[l-i-1].getDescription(), "\n", " ", -1))
 	}
 
 	return items
+}
+
+func (c *Client) getFeeds() []string {
+	feeds := make([]string, 0)
+
+	for _, f := range c.Feeds {
+		f.mu.Lock()
+		feeds = append(feeds, f.Title)
+		f.mu.Unlock()
+	}
+	return feeds
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 )
 
@@ -24,21 +23,6 @@ func Run(f string) {
 
 		go cl.reload()
 		t.start()
-		// <-time.Tick(6 * time.Second)
-
-		file, err := os.Create("fm.json")
-		if err != nil {
-			panic(err)
-		}
-		defer file.Close()
-
-		ppjs, err := json.MarshalIndent(cl.Feeds, "", "  ")
-		if err != nil {
-			panic(err)
-		}
-
-		file.Write(ppjs)
-
 	} else if strings.Contains(f, "json") {
 		dat, err := ioutil.ReadFile(f)
 		if err != nil {
