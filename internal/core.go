@@ -2,36 +2,54 @@ package internal
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
+	"sync"
 )
 
 func Run(f string) {
+	cl := newClient()
+
 	if strings.Contains(f, "xml") {
 		feed, err := feedFromFile(f)
 		if err != nil {
 			panic(err)
 		}
 
-		cl := newClient()
-		t := Tui{
-			model: &cl,
-		}
-
 		cl.Feeds = append(cl.Feeds, feed)
 
-		go cl.reload()
-		t.start()
 	} else if strings.Contains(f, "json") {
 		dat, err := ioutil.ReadFile(f)
 		if err != nil {
 			panic(err)
 		}
 
-		var c Client
-		json.Unmarshal(dat, &c)
+		json.Unmarshal(dat, &cl.Feeds)
 
-		fmt.Println(c.Feeds[0].Items[0].Description)
+		for _, f := range cl.Feeds {
+			f.mu = &sync.Mutex{}
+			cl.itemSelected = append(cl.itemSelected, 0)
+		}
 	}
+
+	t := Tui{
+		model: &cl,
+	}
+
+	go cl.reload()
+	t.start()
+
+	file, err := os.Create("fm.json")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	ppjs, err := json.MarshalIndent(cl.Feeds, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+
+	file.Write(ppjs)
 }

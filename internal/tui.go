@@ -9,12 +9,12 @@ import (
 )
 
 type Tui struct {
-	model       *Client
-	items       *widgets.List
-	feeds       *widgets.List
-	width       int
-	height      int
-	previousKey string
+	model  *Client
+	items  *widgets.List
+	feeds  *widgets.List
+	search *widgets.Paragraph
+	width  int
+	height int
 }
 
 func (t *Tui) start() error {
@@ -23,23 +23,27 @@ func (t *Tui) start() error {
 	}
 	defer ui.Close()
 
-	l := widgets.NewList()
-	l.Title = "Articles"
-	l.TextStyle = ui.NewStyle(7)
-	l.SelectedRowStyle = ui.NewStyle(15)
-	l.WrapText = false
+	p := widgets.NewParagraph()
+	p.Title = "Search"
+	p.PaddingLeft = 1
+	p.TextStyle = ui.NewStyle(7)
+	t.search = p
 
-	t.items = l
+	l1 := widgets.NewList()
+	l1.Title = "Articles"
+	l1.TextStyle = ui.NewStyle(7)
+	l1.SelectedRowStyle = ui.NewStyle(15)
+	l1.WrapText = false
+	t.items = l1
 
-	l = widgets.NewList()
-	l.Title = "Feeds"
-	l.TextStyle = ui.NewStyle(7)
-	l.SelectedRowStyle = ui.NewStyle(15)
-	l.WrapText = false
+	l2 := widgets.NewList()
+	l2.Title = "Feeds"
+	l2.TextStyle = ui.NewStyle(7)
+	l2.SelectedRowStyle = ui.NewStyle(15)
+	l2.WrapText = false
+	t.feeds = l2
 
 	t.width, t.height = ui.TerminalDimensions()
-
-	t.feeds = l
 
 	t.render()
 	uiEvents := ui.PollEvents()
@@ -64,43 +68,20 @@ func (t *Tui) start() error {
 
 func (t *Tui) handleKey(key string) bool {
 	switch key {
-	case "q", "<C-c>":
+	case "<C-c>":
 		return true
-	case "j", "<Down>":
-		t.model.scrollDown()
-	case "k", "<Up>":
-		t.model.scrollUp()
-	case "<C-d>":
-		t.items.ScrollHalfPageDown()
-	case "<C-u>":
-		t.items.ScrollHalfPageUp()
-	case "<C-f>":
-		t.items.ScrollPageDown()
-	case "<C-b>":
-		t.items.ScrollPageUp()
-	case "g":
-		if t.previousKey == "g" {
-			t.items.ScrollTop()
-		}
-	case "<Home>":
-		t.items.ScrollTop()
-	case "G", "<End>":
-		t.items.ScrollBottom()
-	case "<Right>", "<Left>":
+	case "/":
 		state := t.model.peekState()
-		if state.route == main {
-			if state.active == feeds {
-				state.active = items
-			} else if state.active == items {
-				state.active = feeds
-			}
+		if state.route == main && state.active != search {
+			t.model.pushState(State{
+				route:  main,
+				active: search,
+			})
+		} else {
+			handleInput(key, t)
 		}
-	}
-
-	if t.previousKey == "g" {
-		t.previousKey = ""
-	} else {
-		t.previousKey = key
+	default:
+		handleInput(key, t)
 	}
 
 	return false
@@ -109,21 +90,18 @@ func (t *Tui) handleKey(key string) bool {
 func (t *Tui) render() {
 	state := t.model.peekState()
 
-	it := t.model.getItems()
-	for i := range it {
-		it[i] = fmt.Sprintf("[%d] %s", i+1, it[i])
-	}
-	t.items.Rows = it
-	t.items.SelectedRow = t.model.itemSelected
-	if state.active == items {
-		t.items.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
-		t.items.TitleStyle = ui.NewStyle(ui.ColorCyan)
+	// draw search
+	t.search.Text = t.model.input
+	if state.active == search {
+		t.search.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
+		t.search.TitleStyle = ui.NewStyle(ui.ColorCyan)
 	} else {
-		t.items.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
-		t.items.TitleStyle = ui.NewStyle(ui.ColorWhite)
+		t.search.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
+		t.search.TitleStyle = ui.NewStyle(ui.ColorWhite)
 	}
-	t.items.SetRect(t.width/2, 0, t.width, 15)
+	t.search.SetRect(0, 0, t.width, 3)
 
+	// draw feeds
 	fd := t.model.getFeeds()
 	for i := range fd {
 		fd[i] = fmt.Sprintf("[%d] %s", i+1, fd[i])
@@ -137,8 +115,23 @@ func (t *Tui) render() {
 		t.feeds.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
 		t.feeds.TitleStyle = ui.NewStyle(ui.ColorWhite)
 	}
-	t.feeds.SetRect(0, 0, t.width/2, 15)
+	t.feeds.SetRect(0, 3, t.width/2, 15)
 
-	ui.Render(t.items)
-	ui.Render(t.feeds)
+	// draw items
+	it := t.model.getItems()
+	for i := range it {
+		it[i] = fmt.Sprintf("[%d] %s", i+1, it[i])
+	}
+	t.items.Rows = it
+	t.items.SelectedRow = t.model.itemSelected[t.model.feedSelected]
+	if state.active == items {
+		t.items.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
+		t.items.TitleStyle = ui.NewStyle(ui.ColorCyan)
+	} else {
+		t.items.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
+		t.items.TitleStyle = ui.NewStyle(ui.ColorWhite)
+	}
+	t.items.SetRect(t.width/2, 3, t.width, 15)
+
+	ui.Render(t.items, t.feeds, t.search)
 }

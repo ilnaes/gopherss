@@ -2,6 +2,7 @@ package internal
 
 import (
 	"errors"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -30,16 +31,16 @@ type State struct {
 
 type Client struct {
 	Feeds        []*Feed
-	items        []*Item
 	navStack     []State
 	feedSelected int
-	itemSelected int
+	itemSelected []int
+	input        string
+	cursor       int
 }
 
 func newClient() Client {
 	return Client{
 		Feeds: make([]*Feed, 0),
-		items: nil,
 		navStack: []State{
 			{
 				route:  main,
@@ -47,18 +48,45 @@ func newClient() Client {
 			},
 		},
 		feedSelected: 0,
-		itemSelected: 0,
+		itemSelected: []int{},
 	}
 }
 
+func (c *Client) openBrowser() {
+	if runtime.GOOS == "darwin" {
+	}
+}
+
+func (c *Client) addFeed(url string) {
+	feed, err := feedFromURL(url)
+	if err != nil {
+		return
+	}
+
+	c.Feeds = append(c.Feeds, feed)
+	c.itemSelected = append(c.itemSelected, 0)
+}
+
 func (c *Client) scrollUp() {
-	if c.itemSelected > 0 {
-		c.itemSelected -= 1
+	if c.peekState().active == items {
+		if c.itemSelected[c.feedSelected] > 0 {
+			c.itemSelected[c.feedSelected] -= 1
+		}
+	}
+	if c.peekState().active == feeds {
+		if c.feedSelected > 0 {
+			c.feedSelected -= 1
+		}
 	}
 }
 
 func (c *Client) scrollDown() {
-	c.itemSelected += 1
+	if c.peekState().active == items {
+		c.itemSelected[c.feedSelected] += 1
+	}
+	if c.peekState().active == feeds && c.feedSelected < len(c.Feeds)-1 {
+		c.feedSelected += 1
+	}
 }
 
 func (c *Client) reload() {
@@ -106,13 +134,17 @@ func (c *Client) getItems() []string {
 		return items
 	}
 
-	c.Feeds[0].mu.Lock()
-	defer c.Feeds[0].mu.Unlock()
+	feed := c.Feeds[c.feedSelected]
 
-	l := len(c.Feeds[0].Items)
-	for i := range c.Feeds[0].Items {
-		items = append(items, c.Feeds[0].Items[l-i-1].Title+"  "+
-			strings.Replace(c.Feeds[0].Items[l-i-1].getDescription(), "\n", " ", -1))
+	feed.mu.Lock()
+	defer feed.mu.Unlock()
+
+	l := len(feed.Items)
+	for i := range feed.Items {
+		if !feed.Items[l-i-1].Deleted {
+			items = append(items, feed.Items[l-i-1].Title+"  "+
+				strings.Replace(feed.Items[l-i-1].getDescription(), "\n", " ", -1))
+		}
 	}
 
 	return items

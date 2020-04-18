@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"io/ioutil"
 	"sync"
 
@@ -19,11 +20,19 @@ type Feed struct {
 
 // feed from url
 func feedFromURL(url string) (*Feed, error) {
+	n := len(url)
+
+	if n == 0 {
+		return nil, errors.New("Empty URL")
+	}
 	fp := gofeed.NewParser()
 
 	gf, err := fp.ParseURL(url)
 	if err != nil {
-		return nil, err
+		gf, err = fp.ParseURL(url + "/feed/")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return fromGofeed(gf), nil
