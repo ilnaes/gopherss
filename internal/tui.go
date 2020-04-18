@@ -12,7 +12,7 @@ type Tui struct {
 	model  *Client
 	items  *widgets.List
 	feeds  *widgets.List
-	search *widgets.Paragraph
+	search *Textbox
 	width  int
 	height int
 }
@@ -23,7 +23,7 @@ func (t *Tui) start() error {
 	}
 	defer ui.Close()
 
-	p := widgets.NewParagraph()
+	p := NewTextbox()
 	p.Title = "Search"
 	p.PaddingLeft = 1
 	p.TextStyle = ui.NewStyle(7)
@@ -95,9 +95,12 @@ func (t *Tui) render() {
 	if state.active == search {
 		t.search.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
 		t.search.TitleStyle = ui.NewStyle(ui.ColorCyan)
+		t.search.Cursor = t.model.cursor
+		t.search.ShowCursor = true
 	} else {
 		t.search.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
 		t.search.TitleStyle = ui.NewStyle(ui.ColorWhite)
+		t.search.ShowCursor = false
 	}
 	t.search.SetRect(0, 0, t.width, 3)
 
@@ -123,7 +126,10 @@ func (t *Tui) render() {
 		it[i] = fmt.Sprintf("[%d] %s", i+1, it[i])
 	}
 	t.items.Rows = it
-	t.items.SelectedRow = t.model.itemSelected[t.model.feedSelected]
+
+	if len(it) > 0 {
+		t.items.SelectedRow = t.model.itemSelected[t.model.feedSelected]
+	}
 	if state.active == items {
 		t.items.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
 		t.items.TitleStyle = ui.NewStyle(ui.ColorCyan)

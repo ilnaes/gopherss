@@ -17,14 +17,17 @@ func handleSearch(k string, model *Client) {
 		n := len(model.input)
 		if n > 0 {
 			model.input = model.input[:n-1]
+			model.cursor -= 1
 		}
 	case "<Enter>":
-		model.addFeed(model.input)
+		go model.addFeed(model.input)
 		model.input = ""
+		model.cursor = 0
 		model.popState()
 	default:
 		if len(k) == 1 {
 			model.input += k
+			model.cursor += 1
 		}
 	}
 }

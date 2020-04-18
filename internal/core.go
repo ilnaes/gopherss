@@ -4,22 +4,23 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
-	"strings"
+	"os/user"
 	"sync"
 )
 
 func Run(f string) {
 	cl := newClient()
 
-	if strings.Contains(f, "xml") {
-		feed, err := feedFromFile(f)
-		if err != nil {
-			panic(err)
+	usr, _ := user.Current()
+	dir := usr.HomeDir
+
+	if len(f) == 0 {
+		if _, err := os.Stat(dir + "/.gopherss.json"); err == nil {
+			f = dir + "/.gopherss.json"
 		}
+	}
 
-		cl.Feeds = append(cl.Feeds, feed)
-
-	} else if strings.Contains(f, "json") {
+	if len(f) > 0 {
 		dat, err := ioutil.ReadFile(f)
 		if err != nil {
 			panic(err)
@@ -40,7 +41,7 @@ func Run(f string) {
 	go cl.reload()
 	t.start()
 
-	file, err := os.Create("fm.json")
+	file, err := os.Create(dir + "/.gopherss.json")
 	if err != nil {
 		panic(err)
 	}
