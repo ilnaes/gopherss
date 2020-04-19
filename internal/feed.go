@@ -61,10 +61,8 @@ func feedFromFile(file string) (*Feed, error) {
 // project gofeed.Feed onto Feed
 func fromGofeed(gf *gofeed.Feed) *Feed {
 	items := make([]*Item, 0)
-	l := len(gf.Items)
-	// items array should be in reverse chronological order
-	for i := range gf.Items {
-		items = append(items, itemFrom(gf.Items[l-i-1]))
+	for _, i := range gf.Items {
+		items = append(items, itemFrom(i))
 	}
 
 	f := Feed{
@@ -86,8 +84,25 @@ func fromGofeed(gf *gofeed.Feed) *Feed {
 	return &f
 }
 
+// removes feeds that are discarded
+func (f *Feed) prune() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	j := 0
+	for i := range f.Items {
+		if !f.Items[i].discard {
+			f.Items[j] = f.Items[i]
+			j++
+		}
+	}
+
+	f.Items = f.Items[:j]
+}
+
 // merges the new feed nf into current feed
 // note: assumes nf is transitory so no need to lock it
+// note: also assumes feeds are in reverse chronological order
 func (f *Feed) merge(nf *Feed) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -101,19 +116,59 @@ func (f *Feed) merge(nf *Feed) {
 		f.FeedLink = nf.FeedLink
 	}
 
-	// append only Items that come later
+	// trivial cases
 	if f.Items == nil || len(f.Items) == 0 {
 		f.Items = nf.Items
-	} else {
-		last := f.Items[len(f.Items)-1].PubDate
+		return
+	}
+	if nf.Items == nil || len(nf.Items) == 0 {
+		i := 0
 
-		for i := range nf.Items {
-			if last.Before(*nf.Items[i].PubDate) {
-				f.Items = append(f.Items, nf.Items[i:]...)
-				break
+		// throw away nonsaved
+		for j := range f.Items {
+			if f.Items[j].Save {
+				f.Items[i] = f.Items[j]
+				i++
+			}
+		}
+
+		f.Items = f.Items[:i]
+		return
+	}
+
+	items := make([]*Item, 0)
+
+	n := len(nf.Items) + len(f.Items)
+
+	j := 0
+	k := 0
+	for i := 0; i < n; i++ {
+		if j == len(f.Items) {
+			items = append(items, nf.Items[k])
+			k++
+		} else if k == len(nf.Items) {
+			if !f.Items[j].Save {
+				f.Items[j].Discard()
+			}
+			items = append(items, f.Items[j])
+			j++
+		} else {
+			if f.Items[j].PubDate.After(*nf.Items[k].PubDate) {
+				items = append(items, f.Items[j])
+				j++
+			} else if f.Items[j].PubDate.Before(*nf.Items[k].PubDate) {
+				items = append(items, nf.Items[k])
+				k++
+			} else {
+				items = append(items, f.Items[j])
+				j++
+				k++
+				i++
 			}
 		}
 	}
+
+	f.Items = items
 }
 
 // get new items

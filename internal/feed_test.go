@@ -50,6 +50,7 @@ func TestFeedItems(t *testing.T) {
 					<title>I1</title>
 					<pubDate>Thu, 09 Apr 2020 06:40:37 +0000</pubDate>
 				</item>
+				</channel>
 				</rss>
 			   `)
 	if err != nil {
@@ -62,7 +63,7 @@ func TestFeedItems(t *testing.T) {
 	if f.Items[0].PubDate == nil {
 		t.Error("Didn't get date")
 	}
-	f.Items[0].read()
+	f.Items[0].setRead()
 
 	err = f.updateFromStr(`<rss version="2.0">
 				<channel>
@@ -73,13 +74,14 @@ func TestFeedItems(t *testing.T) {
 					<title>I2</title>
 					<pubDate>Wed, 08 Apr 2020 06:40:37 +0000</pubDate>
 				</item>
+				</channel>
 				</rss>
 			   `)
 	if err != nil {
 		t.Error("Couldn't updateFromStr: ", err)
 	}
 
-	if len(f.Items) != 1 {
+	if len(f.Items) != 2 {
 		t.Error("Items didn't merge correctly")
 	}
 
@@ -92,21 +94,35 @@ func TestFeedItems(t *testing.T) {
 					<title>I3</title>
 					<pubDate>Fri, 10 Apr 2020 06:40:37 +0000</pubDate>
 				</item>
+				<item>
+					<title>I1</title>
+					<pubDate>Thu, 09 Apr 2020 06:40:37 +0000</pubDate>
+				</item>
+				</channel>
 				</rss>
 			   `)
 	if err != nil {
 		t.Error("Couldn't updateFromStr: ", err)
 	}
 
-	if len(f.Items) != 2 {
+	if len(f.Items) != 3 {
 		t.Error("Items didn't merge correctly")
 	}
 
-	if !f.Items[0].Read {
+	if !f.Items[1].Read {
 		t.Error("trampled on flag")
 	}
 
-	if f.Items[1].Title != "I3" {
+	if f.Items[1].Title != "I1" {
+		t.Error("Didn't read second item correctly")
+	}
+
+	f.prune()
+
+	if len(f.Items) != 2 {
+		t.Error("Items didn't prune properly")
+	}
+	if f.Items[1].Title != "I1" {
 		t.Error("Didn't read second item correctly")
 	}
 }

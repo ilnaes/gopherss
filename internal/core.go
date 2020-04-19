@@ -13,10 +13,11 @@ func Run(f string) {
 
 	usr, _ := user.Current()
 	dir := usr.HomeDir
+	def := dir + "/.gopherss.json"
 
 	if len(f) == 0 {
-		if _, err := os.Stat(dir + "/.gopherss.json"); err == nil {
-			f = dir + "/.gopherss.json"
+		if _, err := os.Stat(def); err == nil {
+			f = def
 		}
 	}
 
@@ -41,7 +42,11 @@ func Run(f string) {
 	go cl.reload()
 	t.start()
 
-	file, err := os.Create(dir + "/.gopherss.json")
+	for _, f := range cl.Feeds {
+		f.prune()
+	}
+
+	file, err := os.Create(def)
 	if err != nil {
 		panic(err)
 	}

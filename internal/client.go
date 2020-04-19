@@ -92,7 +92,7 @@ func (c *Client) scrollDown() {
 func (c *Client) reload() {
 	for {
 		for _, f := range c.Feeds {
-			f.update()
+			go f.update()
 		}
 		<-time.Tick(tickTime)
 	}
@@ -139,11 +139,10 @@ func (c *Client) getItems() []string {
 	feed.mu.Lock()
 	defer feed.mu.Unlock()
 
-	l := len(feed.Items)
-	for i := range feed.Items {
-		if !feed.Items[l-i-1].Deleted {
-			items = append(items, feed.Items[l-i-1].Title+"  "+
-				strings.Replace(feed.Items[l-i-1].getDescription(), "\n", " ", -1))
+	for _, i := range feed.Items {
+		if !i.Deleted {
+			items = append(items, i.Title+"  "+
+				strings.Replace(i.getDescription(), "\n", " ", -1))
 		}
 	}
 
