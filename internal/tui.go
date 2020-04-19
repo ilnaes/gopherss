@@ -8,6 +8,11 @@ import (
 	"github.com/gizak/termui/v3/widgets"
 )
 
+func getSpinner() string {
+	spins := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	return spins[time.Now().Nanosecond()/100000000]
+}
+
 type Tui struct {
 	model  *Client
 	items  *widgets.List
@@ -26,7 +31,6 @@ func (t *Tui) start() error {
 
 	tb := NewTextbox()
 	tb.Title = "Search"
-	tb.PaddingLeft = 1
 	tb.TextStyle = ui.NewStyle(7)
 	t.search = tb
 
@@ -63,7 +67,6 @@ func (t *Tui) start() error {
 					return nil
 				}
 			}
-
 		case <-time.Tick(refreshTime):
 		}
 
@@ -74,16 +77,31 @@ func (t *Tui) start() error {
 func (t *Tui) handleKey(key string) bool {
 	switch key {
 	case "<C-c>":
-		return true
-	case "/":
-		state := t.model.peekState()
-		if state.route == main && state.active != search {
-			t.model.pushState(State{
-				route:  main,
-				active: search,
-			})
+		if t.model.peekState().active == search {
+			t.model.popState()
 		} else {
-			handleInput(key, t)
+			return true
+		}
+	case "q":
+		if t.model.peekState().active == search {
+			handleSearch(key, t.model)
+		} else {
+			_, err := t.model.popState()
+			if err != nil {
+				return true
+			}
+		}
+	case "/":
+		if !t.model.searchOn {
+			state := t.model.peekState()
+			if state.route == main && state.active != search {
+				t.model.pushState(State{
+					route:  main,
+					active: search,
+				})
+			} else {
+				handleInput(key, t)
+			}
 		}
 	default:
 		handleInput(key, t)
@@ -92,15 +110,16 @@ func (t *Tui) handleKey(key string) bool {
 	return false
 }
 
-func (t *Tui) render() {
-	state := t.model.peekState()
-
-	// draw search
-	t.search.Text = t.model.input
-	if state.active == search {
+func (t *Tui) drawSearch() {
+	if t.model.searchOn {
+		t.search.Text = getSpinner() + " " + t.model.input
+	} else {
+		t.search.Text = "  " + t.model.input
+	}
+	if t.model.peekState().active == search {
 		t.search.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
 		t.search.TitleStyle = ui.NewStyle(ui.ColorCyan)
-		t.search.Cursor = t.model.cursor
+		t.search.Cursor = t.model.cursor + 2
 		t.search.ShowCursor = true
 	} else {
 		t.search.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
@@ -108,15 +127,16 @@ func (t *Tui) render() {
 		t.search.ShowCursor = false
 	}
 	t.search.SetRect(0, 0, t.width, 3)
+}
 
-	// draw feeds
+func (t *Tui) drawFeeds() {
 	fd := t.model.getFeeds()
 	for i := range fd {
 		fd[i] = fmt.Sprintf("[%d] %s", i+1, fd[i])
 	}
 	t.feeds.Rows = fd
 	t.feeds.SelectedRow = t.model.feedSelected
-	if state.active == feeds {
+	if t.model.peekState().active == feeds {
 		t.feeds.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
 		t.feeds.TitleStyle = ui.NewStyle(ui.ColorCyan)
 	} else {
@@ -124,8 +144,9 @@ func (t *Tui) render() {
 		t.feeds.TitleStyle = ui.NewStyle(ui.ColorWhite)
 	}
 	t.feeds.SetRect(0, 3, t.width/3, 15)
+}
 
-	// draw items
+func (t *Tui) drawItemsList() {
 	itemList := t.model.getItems()
 	for i := range itemList {
 		itemList[i] = fmt.Sprintf("[%d] %s", i+1, itemList[i])
@@ -134,7 +155,7 @@ func (t *Tui) render() {
 	if len(itemList) > 0 {
 		t.items.SelectedRow = t.model.itemSelected[t.model.feedSelected]
 	}
-	if state.active == items {
+	if t.model.peekState().active == items {
 		t.items.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
 		t.items.TitleStyle = ui.NewStyle(ui.ColorCyan)
 	} else {
@@ -142,11 +163,22 @@ func (t *Tui) render() {
 		t.items.TitleStyle = ui.NewStyle(ui.ColorWhite)
 	}
 	t.items.SetRect(t.width/3, 3, t.width, 15)
+}
 
-	item := t.model.getItem()
-	if item != nil {
-
+func (t *Tui) drawItemWindow() {
+	if t.model.item != nil {
+		t.box.Text = t.model.item.getContent()
 	}
 
-	ui.Render(t.items, t.feeds, t.search)
+	t.box.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
+	t.box.SetRect(0, 15, t.width, t.height)
+}
+
+func (t *Tui) render() {
+	t.drawSearch()
+	t.drawFeeds()
+	t.drawItemsList()
+	t.drawItemWindow()
+
+	ui.Render(t.items, t.feeds, t.search, t.box)
 }

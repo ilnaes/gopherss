@@ -29,7 +29,7 @@ func feedFromURL(url string) (*Feed, error) {
 
 	gf, err := fp.ParseURL(url)
 	if err != nil {
-		gf, err = fp.ParseURL(url + "/feed/")
+		gf, err = fp.ParseURL(url + "/rss")
 		if err != nil {
 			return nil, err
 		}

@@ -37,6 +37,8 @@ type Client struct {
 	itemSelected []int
 	input        string
 	cursor       int
+	searchOn     bool
+	item         *Item
 	*sync.Mutex
 }
 
@@ -55,6 +57,13 @@ func newClient() Client {
 	}
 }
 
+func (c *Client) updateItem() {
+	f := c.feedSelected
+	if len(c.Feeds) > 0 && len(c.Feeds[f].Items) > 0 {
+		c.item = c.Feeds[f].Items[c.itemSelected[f]]
+	}
+}
+
 func (c *Client) openBrowser() {
 	if runtime.GOOS == "darwin" {
 	}
@@ -66,6 +75,7 @@ func (c *Client) scrollUp() {
 	if c.peekState().active == items {
 		if c.itemSelected[c.feedSelected] > 0 {
 			c.itemSelected[c.feedSelected] -= 1
+			c.updateItem()
 		}
 	}
 	if c.peekState().active == feeds {
@@ -81,6 +91,7 @@ func (c *Client) scrollDown() {
 	if c.peekState().active == items {
 		if c.itemSelected[c.feedSelected] < len(c.Feeds[c.feedSelected].Items)-1 {
 			c.itemSelected[c.feedSelected] += 1
+			c.updateItem()
 		}
 	}
 	if c.peekState().active == feeds && c.feedSelected < len(c.Feeds)-1 {
@@ -90,9 +101,6 @@ func (c *Client) scrollDown() {
 
 func (c *Client) reload() {
 	for {
-		// TODO: change this
-		<-time.Tick(tickTime)
-
 		c.Lock()
 		for _, f := range c.Feeds {
 			go func(f *Feed) {
@@ -100,6 +108,9 @@ func (c *Client) reload() {
 			}(f)
 		}
 		c.Unlock()
+
+		// TODO: change this
+		<-time.Tick(tickTime)
 	}
 }
 
@@ -144,16 +155,6 @@ func (c *Client) getItems() []string {
 	c.Unlock()
 
 	return items
-}
-
-func (c *Client) getItem() *Item {
-	if len(c.Feeds) == 0 {
-		return nil
-	}
-
-	// TODO
-	return nil
-
 }
 
 func (c *Client) getFeeds() []string {

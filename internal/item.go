@@ -65,3 +65,11 @@ func (it *Item) setSave() {
 func (it *Item) getDescription() string {
 	return htmlParse(it.Description)
 }
+
+func (it *Item) getContent() string {
+	if len(it.Content) > 0 {
+		return htmlParse(it.Content)
+	} else {
+		return htmlParse(it.Description)
+	}
+}

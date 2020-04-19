@@ -20,9 +20,11 @@ func handleSearch(k string, model *Client) {
 			model.cursor -= 1
 		}
 	case "<Enter>":
+		model.searchOn = true
 		model.popState()
 		go func() {
 			model.addFeed(model.input)
+			model.searchOn = false
 			model.input = ""
 			model.cursor = 0
 		}()
@@ -46,10 +48,11 @@ func handleList(k string, model *Client) {
 			*active = feeds
 		} else {
 			*active = items
+			model.updateItem()
 		}
 	case "<Enter>":
 		if *active == items {
-			model.openBrowser()
+			// TODO
 		}
 	case "d":
 		if *active == feeds {
