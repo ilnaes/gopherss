@@ -4,6 +4,7 @@ import (
 	"errors"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -36,6 +37,7 @@ type Client struct {
 	itemSelected []int
 	input        string
 	cursor       int
+	*sync.Mutex
 }
 
 func newClient() Client {
@@ -49,6 +51,7 @@ func newClient() Client {
 		},
 		feedSelected: 0,
 		itemSelected: []int{},
+		Mutex:        &sync.Mutex{},
 	}
 }
 
@@ -57,17 +60,9 @@ func (c *Client) openBrowser() {
 	}
 }
 
-func (c *Client) addFeed(url string) {
-	feed, err := feedFromURL(url)
-	if err != nil {
-		return
-	}
-
-	c.Feeds = append(c.Feeds, feed)
-	c.itemSelected = append(c.itemSelected, 0)
-}
-
 func (c *Client) scrollUp() {
+	c.Lock()
+	defer c.Unlock()
 	if c.peekState().active == items {
 		if c.itemSelected[c.feedSelected] > 0 {
 			c.itemSelected[c.feedSelected] -= 1
@@ -81,8 +76,12 @@ func (c *Client) scrollUp() {
 }
 
 func (c *Client) scrollDown() {
+	c.Lock()
+	defer c.Unlock()
 	if c.peekState().active == items {
-		c.itemSelected[c.feedSelected] += 1
+		if c.itemSelected[c.feedSelected] < len(c.Feeds[c.feedSelected].Items)-1 {
+			c.itemSelected[c.feedSelected] += 1
+		}
 	}
 	if c.peekState().active == feeds && c.feedSelected < len(c.Feeds)-1 {
 		c.feedSelected += 1
@@ -91,10 +90,16 @@ func (c *Client) scrollDown() {
 
 func (c *Client) reload() {
 	for {
-		for _, f := range c.Feeds {
-			go f.update()
-		}
+		// TODO: change this
 		<-time.Tick(tickTime)
+
+		c.Lock()
+		for _, f := range c.Feeds {
+			go func(f *Feed) {
+				f.update()
+			}(f)
+		}
+		c.Unlock()
 	}
 }
 
@@ -118,15 +123,6 @@ func (c *Client) popState() (State, error) {
 	return res, nil
 }
 
-func (c *Client) getState(s State) *State {
-	n := len(c.navStack)
-	if n == 0 {
-		return nil
-	}
-
-	return &c.navStack[n-1]
-}
-
 func (c *Client) getItems() []string {
 	items := make([]string, 0)
 
@@ -134,28 +130,68 @@ func (c *Client) getItems() []string {
 		return items
 	}
 
-	feed := c.Feeds[c.feedSelected]
+	c.Lock()
 
+	feed := c.Feeds[c.feedSelected]
 	feed.mu.Lock()
-	defer feed.mu.Unlock()
 
 	for _, i := range feed.Items {
-		if !i.Deleted {
-			items = append(items, i.Title+"  "+
-				strings.Replace(i.getDescription(), "\n", " ", -1))
-		}
+		items = append(items, i.Title+"  "+
+			strings.Replace(i.getDescription(), "\n", " ", -1))
 	}
 
+	feed.mu.Unlock()
+	c.Unlock()
+
 	return items
+}
+
+func (c *Client) getItem() *Item {
+	if len(c.Feeds) == 0 {
+		return nil
+	}
+
+	// TODO
+	return nil
+
 }
 
 func (c *Client) getFeeds() []string {
 	feeds := make([]string, 0)
 
+	c.Lock()
 	for _, f := range c.Feeds {
 		f.mu.Lock()
 		feeds = append(feeds, f.Title)
 		f.mu.Unlock()
 	}
+	c.Unlock()
+
 	return feeds
+}
+
+func (c *Client) removeFeed() {
+	c.Lock()
+	defer c.Unlock()
+
+	c.Feeds = append(c.Feeds[:c.feedSelected], c.Feeds[c.feedSelected+1:]...)
+	c.itemSelected = append(c.itemSelected[:c.feedSelected],
+		c.itemSelected[c.feedSelected+1:]...)
+
+	if c.feedSelected >= len(c.Feeds) {
+		c.feedSelected--
+	}
+
+}
+
+func (c *Client) addFeed(url string) {
+	feed, err := feedFromURL(url)
+	if err != nil {
+		return
+	}
+
+	c.Lock()
+	c.Feeds = append(c.Feeds, feed)
+	c.itemSelected = append(c.itemSelected, 0)
+	c.Unlock()
 }

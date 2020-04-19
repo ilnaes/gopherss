@@ -12,6 +12,7 @@ type Tui struct {
 	model  *Client
 	items  *widgets.List
 	feeds  *widgets.List
+	box    *widgets.Paragraph
 	search *Textbox
 	width  int
 	height int
@@ -23,11 +24,11 @@ func (t *Tui) start() error {
 	}
 	defer ui.Close()
 
-	p := NewTextbox()
-	p.Title = "Search"
-	p.PaddingLeft = 1
-	p.TextStyle = ui.NewStyle(7)
-	t.search = p
+	tb := NewTextbox()
+	tb.Title = "Search"
+	tb.PaddingLeft = 1
+	tb.TextStyle = ui.NewStyle(7)
+	t.search = tb
 
 	l1 := widgets.NewList()
 	l1.Title = "Articles"
@@ -42,6 +43,10 @@ func (t *Tui) start() error {
 	l2.SelectedRowStyle = ui.NewStyle(15)
 	l2.WrapText = false
 	t.feeds = l2
+
+	p := widgets.NewParagraph()
+	p.TextStyle = ui.NewStyle(7)
+	t.box = p
 
 	t.width, t.height = ui.TerminalDimensions()
 
@@ -118,16 +123,15 @@ func (t *Tui) render() {
 		t.feeds.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
 		t.feeds.TitleStyle = ui.NewStyle(ui.ColorWhite)
 	}
-	t.feeds.SetRect(0, 3, t.width/2, 15)
+	t.feeds.SetRect(0, 3, t.width/3, 15)
 
 	// draw items
-	it := t.model.getItems()
-	for i := range it {
-		it[i] = fmt.Sprintf("[%d] %s", i+1, it[i])
+	itemList := t.model.getItems()
+	for i := range itemList {
+		itemList[i] = fmt.Sprintf("[%d] %s", i+1, itemList[i])
 	}
-	t.items.Rows = it
-
-	if len(it) > 0 {
+	t.items.Rows = itemList
+	if len(itemList) > 0 {
 		t.items.SelectedRow = t.model.itemSelected[t.model.feedSelected]
 	}
 	if state.active == items {
@@ -137,7 +141,12 @@ func (t *Tui) render() {
 		t.items.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
 		t.items.TitleStyle = ui.NewStyle(ui.ColorWhite)
 	}
-	t.items.SetRect(t.width/2, 3, t.width, 15)
+	t.items.SetRect(t.width/3, 3, t.width, 15)
+
+	item := t.model.getItem()
+	if item != nil {
+
+	}
 
 	ui.Render(t.items, t.feeds, t.search)
 }

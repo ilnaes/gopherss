@@ -20,10 +20,12 @@ func handleSearch(k string, model *Client) {
 			model.cursor -= 1
 		}
 	case "<Enter>":
-		go model.addFeed(model.input)
-		model.input = ""
-		model.cursor = 0
 		model.popState()
+		go func() {
+			model.addFeed(model.input)
+			model.input = ""
+			model.cursor = 0
+		}()
 	default:
 		if len(k) == 1 {
 			model.input += k
@@ -33,20 +35,25 @@ func handleSearch(k string, model *Client) {
 }
 
 func handleList(k string, model *Client) {
+	active := &model.peekState().active
 	switch k {
 	case "j", "<Down>":
 		model.scrollDown()
 	case "k", "<Up>":
 		model.scrollUp()
 	case "h", "<Left>", "l", "<Right>":
-		if model.peekState().active == items {
-			model.peekState().active = feeds
+		if *active == items {
+			*active = feeds
 		} else {
-			model.peekState().active = items
+			*active = items
 		}
 	case "<Enter>":
-		if model.peekState().active == items {
+		if *active == items {
 			model.openBrowser()
+		}
+	case "d":
+		if *active == feeds {
+			model.removeFeed()
 		}
 	}
 }

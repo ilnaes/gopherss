@@ -43,7 +43,9 @@ func Run(f string) {
 	t.start()
 
 	for _, f := range cl.Feeds {
+		f.mu.Lock()
 		f.prune()
+		f.mu.Unlock()
 	}
 
 	file, err := os.Create(def)

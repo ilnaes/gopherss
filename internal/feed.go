@@ -86,9 +86,6 @@ func fromGofeed(gf *gofeed.Feed) *Feed {
 
 // removes feeds that are discarded
 func (f *Feed) prune() {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
 	j := 0
 	for i := range f.Items {
 		if !f.Items[i].discard {

@@ -11,9 +11,9 @@ type Item struct {
 	Link        string
 	Author      string
 	Description string
+	Content     string
 	PubDate     *time.Time
 	Save        bool
-	Deleted     bool
 	Read        bool
 	discard     bool
 }
@@ -23,6 +23,11 @@ func itemFrom(gi *gofeed.Item) *Item {
 		Title:       gi.Title,
 		Link:        gi.Link,
 		Description: gi.Description,
+		Content:     gi.Content,
+	}
+
+	if len(i.Content) == 0 {
+		i.Content = gi.Description
 	}
 
 	if gi.Author != nil {
@@ -39,6 +44,10 @@ func itemFrom(gi *gofeed.Item) *Item {
 	return &i
 }
 
+func (it *Item) setUnread() {
+	it.Read = false
+}
+
 func (it *Item) setRead() {
 	it.Read = true
 }
@@ -50,7 +59,6 @@ func (it *Item) Discard() {
 
 func (it *Item) setSave() {
 	it.discard = false
-	it.Deleted = false
 	it.Save = true
 }
 
