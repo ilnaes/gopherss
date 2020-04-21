@@ -17,7 +17,7 @@ type Tui struct {
 	model  *Client
 	items  *widgets.List
 	feeds  *widgets.List
-	box    *widgets.Paragraph
+	box    *Textbox
 	search *Textbox
 	width  int
 	height int
@@ -48,7 +48,7 @@ func (t *Tui) start() error {
 	l2.WrapText = false
 	t.feeds = l2
 
-	p := widgets.NewParagraph()
+	p := NewTextbox()
 	p.TextStyle = ui.NewStyle(7)
 	t.box = p
 
@@ -111,21 +111,26 @@ func (t *Tui) handleKey(key string) bool {
 }
 
 func (t *Tui) drawSearch() {
+	display := ""
 	if t.model.searchOn {
-		t.search.Text = getSpinner() + " " + t.model.input
-	} else {
-		t.search.Text = "  " + t.model.input
-	}
-	if t.model.peekState().active == search {
+		display = getSpinner() + " " + t.model.input
+		t.search.ShowCursor = false
+	} else if t.model.peekState().active == search {
+		// redo this
 		t.search.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
 		t.search.TitleStyle = ui.NewStyle(ui.ColorCyan)
 		t.search.Cursor = t.model.cursor + 2
 		t.search.ShowCursor = true
+		display = "  " + t.model.input
 	} else {
 		t.search.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
 		t.search.TitleStyle = ui.NewStyle(ui.ColorWhite)
 		t.search.ShowCursor = false
+
+		display = "  " + t.model.input
 	}
+
+	t.search.Text = display
 	t.search.SetRect(0, 0, t.width, 3)
 }
 
@@ -170,7 +175,12 @@ func (t *Tui) drawItemWindow() {
 		t.box.Text = t.model.item.getContent()
 	}
 
-	t.box.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
+	if t.model.peekState().active == box {
+		t.box.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
+	} else {
+		t.box.Block.BorderStyle = ui.NewStyle(ui.ColorWhite)
+	}
+	t.box.Top = t.model.boxTop
 	t.box.SetRect(0, 15, t.width, t.height)
 }
 

@@ -100,7 +100,7 @@ func (f *Feed) prune() {
 // merges the new feed nf into current feed
 // note: assumes nf is transitory so no need to lock it
 // note: also assumes feeds are in reverse chronological order
-func (f *Feed) merge(nf *Feed) {
+func (f *Feed) updateFrom(nf *Feed) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -113,59 +113,7 @@ func (f *Feed) merge(nf *Feed) {
 		f.FeedLink = nf.FeedLink
 	}
 
-	// trivial cases
-	if f.Items == nil || len(f.Items) == 0 {
-		f.Items = nf.Items
-		return
-	}
-	if nf.Items == nil || len(nf.Items) == 0 {
-		i := 0
-
-		// throw away nonsaved
-		for j := range f.Items {
-			if f.Items[j].Save {
-				f.Items[i] = f.Items[j]
-				i++
-			}
-		}
-
-		f.Items = f.Items[:i]
-		return
-	}
-
-	items := make([]*Item, 0)
-
-	n := len(nf.Items) + len(f.Items)
-
-	j := 0
-	k := 0
-	for i := 0; i < n; i++ {
-		if j == len(f.Items) {
-			items = append(items, nf.Items[k])
-			k++
-		} else if k == len(nf.Items) {
-			if !f.Items[j].Save {
-				f.Items[j].Discard()
-			}
-			items = append(items, f.Items[j])
-			j++
-		} else {
-			if f.Items[j].PubDate.After(*nf.Items[k].PubDate) {
-				items = append(items, f.Items[j])
-				j++
-			} else if f.Items[j].PubDate.Before(*nf.Items[k].PubDate) {
-				items = append(items, nf.Items[k])
-				k++
-			} else {
-				items = append(items, f.Items[j])
-				j++
-				k++
-				i++
-			}
-		}
-	}
-
-	f.Items = items
+	f.Items = mergeItems(f.Items, nf.Items, true)
 }
 
 // get new items
@@ -175,7 +123,7 @@ func (f *Feed) update() error {
 		return err
 	}
 
-	f.merge(nf)
+	f.updateFrom(nf)
 	return nil
 }
 
@@ -185,6 +133,6 @@ func (f *Feed) updateFromStr(s string) error {
 		return err
 	}
 
-	f.merge(nf)
+	f.updateFrom(nf)
 	return nil
 }

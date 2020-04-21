@@ -6,6 +6,8 @@ func handleInput(k string, t *Tui) {
 		handleList(k, t.model)
 	case search:
 		handleSearch(k, t.model)
+	case box:
+		handleBox(k, t.model)
 	}
 }
 
@@ -36,13 +38,22 @@ func handleSearch(k string, model *Client) {
 	}
 }
 
+func handleBox(k string, model *Client) {
+	switch k {
+	case "j", "<Down>":
+		model.scrollBoxDown()
+	case "k", "<Up>":
+		model.scrollBoxUp()
+	}
+}
+
 func handleList(k string, model *Client) {
 	active := &model.peekState().active
 	switch k {
 	case "j", "<Down>":
-		model.scrollDown()
+		model.scrollListDown()
 	case "k", "<Up>":
-		model.scrollUp()
+		model.scrollListUp()
 	case "h", "<Left>", "l", "<Right>":
 		if *active == items {
 			*active = feeds
@@ -52,7 +63,11 @@ func handleList(k string, model *Client) {
 		}
 	case "<Enter>":
 		if *active == items {
-			// TODO
+			model.boxTop = 0
+			model.pushState(State{
+				route:  main,
+				active: box,
+			})
 		}
 	case "d":
 		if *active == feeds {

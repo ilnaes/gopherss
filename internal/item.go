@@ -73,3 +73,48 @@ func (it *Item) getContent() string {
 		return htmlParse(it.Description)
 	}
 }
+
+// merges item list i2 into i1, prefering i1
+// mark determines if older items in i1 get marked for deleted
+func mergeItems(i1, i2 []*Item, mark bool) []*Item {
+	// trivial cases
+	if i1 == nil || len(i1) == 0 {
+		return i2
+	}
+	if i2 == nil || len(i2) == 0 {
+		return i1
+	}
+
+	items := make([]*Item, 0)
+
+	n := len(i2) + len(i1)
+
+	j := 0
+	k := 0
+	for i := 0; i < n; i++ {
+		if j == len(i1) {
+			items = append(items, i2[k])
+			k++
+		} else if k == len(i2) {
+			if mark && !i1[j].Save {
+				i1[j].Discard()
+			}
+			items = append(items, i1[j])
+			j++
+		} else {
+			if i1[j].PubDate.After(*i2[k].PubDate) {
+				items = append(items, i1[j])
+				j++
+			} else if i1[j].PubDate.Before(*i2[k].PubDate) {
+				items = append(items, i2[k])
+				k++
+			} else {
+				items = append(items, i1[j])
+				j++
+				k++
+				i++
+			}
+		}
+	}
+	return items
+}

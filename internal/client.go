@@ -13,7 +13,7 @@ type Panel int
 const (
 	feeds Panel = iota
 	items
-	item
+	box
 	dialog
 	search
 	help
@@ -39,6 +39,7 @@ type Client struct {
 	cursor       int
 	searchOn     bool
 	item         *Item
+	boxTop       int
 	*sync.Mutex
 }
 
@@ -69,7 +70,18 @@ func (c *Client) openBrowser() {
 	}
 }
 
-func (c *Client) scrollUp() {
+func (c *Client) scrollBoxUp() {
+	if c.boxTop > 0 {
+		c.boxTop--
+	}
+}
+
+func (c *Client) scrollBoxDown() {
+	c.boxTop++
+	// TODO: error check this
+}
+
+func (c *Client) scrollListUp() {
 	c.Lock()
 	defer c.Unlock()
 	if c.peekState().active == items {
@@ -85,7 +97,7 @@ func (c *Client) scrollUp() {
 	}
 }
 
-func (c *Client) scrollDown() {
+func (c *Client) scrollListDown() {
 	c.Lock()
 	defer c.Unlock()
 	if c.peekState().active == items {

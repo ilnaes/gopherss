@@ -10,6 +10,7 @@ type Textbox struct {
 	Block
 	Text       string
 	TextStyle  Style
+	Top        int
 	WrapText   bool
 	Cursor     int
 	ShowCursor bool
@@ -26,20 +27,23 @@ func NewTextbox() *Textbox {
 func (self *Textbox) Draw(buf *Buffer) {
 	self.Block.Draw(buf)
 
-	cells := ParseStyles(self.Text, self.TextStyle)
+	cells := make([]Cell, 0)
+	for _, r := range []rune(self.Text) {
+		cells = append(cells, Cell{Rune: r, Style: self.TextStyle})
+	}
 	if self.WrapText {
 		cells = WrapCells(cells, uint(self.Inner.Dx()))
 	}
 
 	if self.ShowCursor {
 		if self.Cursor >= len(self.Text) {
-			cells = append(cells, Cell{Style: Style{Bg: ColorWhite}})
+			cells = append(cells, Cell{Style: Style{Bg: ColorYellow}})
 		} else {
-			cells[self.Cursor].Style.Bg = ColorWhite
+			cells[self.Cursor].Style.Bg = ColorYellow
 		}
 	}
 
-	rows := SplitCells(cells, '\n')
+	rows := SplitCells(cells, '\n')[self.Top:]
 
 	for y, row := range rows {
 		if y+self.Inner.Min.Y >= self.Inner.Max.Y {
