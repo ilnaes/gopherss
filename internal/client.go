@@ -53,15 +53,21 @@ func newClient() Client {
 			},
 		},
 		feedSelected: 0,
-		itemSelected: []int{},
+		itemSelected: []int{0},
 		Mutex:        &sync.Mutex{},
 	}
 }
 
 func (c *Client) updateItem() {
-	f := c.feedSelected
-	if len(c.Feeds) > 0 && len(c.Feeds[f].Items) > 0 {
-		c.item = c.Feeds[f].Items[c.itemSelected[f]]
+	var feed []*Item
+	if c.feedSelected > 0 {
+		feed = c.Feeds[c.feedSelected-1].Items
+	} else {
+		feed = c.getAll()
+	}
+
+	if len(feed) > 0 {
+		c.item = feed[c.itemSelected[c.feedSelected]]
 	}
 }
 
@@ -97,16 +103,37 @@ func (c *Client) scrollListUp() {
 	}
 }
 
+// get a merged list of all items
+// should be called while holding lock
+func (c *Client) getAll() []*Item {
+	items := make([]*Item, 0)
+
+	for _, f := range c.Feeds {
+		f.mu.Lock()
+		items = mergeItems(items, f.Items, false)
+		f.mu.Unlock()
+	}
+
+	return items
+}
+
 func (c *Client) scrollListDown() {
 	c.Lock()
 	defer c.Unlock()
 	if c.peekState().active == items {
-		if c.itemSelected[c.feedSelected] < len(c.Feeds[c.feedSelected].Items)-1 {
+		var feed []*Item
+		if c.feedSelected == 0 {
+			feed = c.getAll()
+		} else {
+			feed = c.Feeds[c.feedSelected-1].Items
+		}
+
+		if c.itemSelected[c.feedSelected] < len(feed)-1 {
 			c.itemSelected[c.feedSelected] += 1
 			c.updateItem()
 		}
 	}
-	if c.peekState().active == feeds && c.feedSelected < len(c.Feeds)-1 {
+	if c.peekState().active == feeds && c.feedSelected < len(c.Feeds) {
 		c.feedSelected += 1
 	}
 }
@@ -147,30 +174,32 @@ func (c *Client) popState() (State, error) {
 }
 
 func (c *Client) getItems() []string {
-	items := make([]string, 0)
-
-	if len(c.Feeds) == 0 {
-		return items
-	}
+	res := make([]string, 0)
+	var items []*Item
 
 	c.Lock()
+	defer c.Unlock()
 
-	feed := c.Feeds[c.feedSelected]
-	feed.mu.Lock()
+	if c.feedSelected == 0 {
+		items = c.getAll()
+	} else {
+		feed := c.Feeds[c.feedSelected-1]
+		items = feed.Items
 
-	for _, i := range feed.Items {
-		items = append(items, i.Title+"  "+
+		feed.mu.Lock()
+		defer feed.mu.Unlock()
+	}
+
+	for _, i := range items {
+		res = append(res, i.Title+"  "+
 			strings.Replace(i.getDescription(), "\n", " ", -1))
 	}
 
-	feed.mu.Unlock()
-	c.Unlock()
-
-	return items
+	return res
 }
 
 func (c *Client) getFeeds() []string {
-	feeds := make([]string, 0)
+	feeds := []string{"All"}
 
 	c.Lock()
 	for _, f := range c.Feeds {
@@ -184,14 +213,19 @@ func (c *Client) getFeeds() []string {
 }
 
 func (c *Client) removeFeed() {
+	if c.feedSelected == 0 {
+		// don't delete All feed
+		return
+	}
+
 	c.Lock()
 	defer c.Unlock()
 
-	c.Feeds = append(c.Feeds[:c.feedSelected], c.Feeds[c.feedSelected+1:]...)
-	c.itemSelected = append(c.itemSelected[:c.feedSelected],
-		c.itemSelected[c.feedSelected+1:]...)
+	c.Feeds = append(c.Feeds[:c.feedSelected-1], c.Feeds[c.feedSelected:]...)
+	c.itemSelected = append(c.itemSelected[:c.feedSelected-1],
+		c.itemSelected[c.feedSelected:]...)
 
-	if c.feedSelected >= len(c.Feeds) {
+	if c.feedSelected > len(c.Feeds) {
 		c.feedSelected--
 	}
 
