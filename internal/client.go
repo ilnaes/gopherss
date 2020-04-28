@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -198,18 +199,21 @@ func (c *Client) getItems() []string {
 	return res
 }
 
-func (c *Client) getFeeds() []string {
+func (c *Client) getFeeds() ([]string, []bool) {
 	feeds := []string{"All"}
+	updating := []bool{false}
 
 	c.Lock()
 	for _, f := range c.Feeds {
 		f.mu.Lock()
 		feeds = append(feeds, f.Title)
+		updating = append(updating, f.updating)
+		updating[0] = updating[0] || f.updating
 		f.mu.Unlock()
 	}
 	c.Unlock()
 
-	return feeds
+	return feeds, updating
 }
 
 func (c *Client) removeFeed() {
@@ -238,7 +242,24 @@ func (c *Client) addFeed(url string) {
 	}
 
 	c.Lock()
-	c.Feeds = append(c.Feeds, feed)
-	c.itemSelected = append(c.itemSelected, 0)
+	i := sort.Search(len(c.Feeds), func(i int) bool {
+		return strings.Compare(c.Feeds[i].Title, feed.Title) >= 0
+	})
+
+	// new feed
+	if i == len(c.Feeds) {
+		c.Feeds = append(c.Feeds, feed)
+		c.itemSelected = append(c.itemSelected, 0)
+	} else {
+		if c.Feeds[i].Title != feed.Title {
+			c.Feeds = append(c.Feeds, nil)
+			copy(c.Feeds[i+1:], c.Feeds[i:])
+			c.Feeds[i] = feed
+
+			c.itemSelected = append(c.itemSelected, 0)
+			copy(c.itemSelected[i+1:], c.itemSelected[i:])
+			c.itemSelected[i] = 0
+		}
+	}
 	c.Unlock()
 }

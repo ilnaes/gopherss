@@ -112,10 +112,7 @@ func (t *Tui) handleKey(key string) bool {
 
 func (t *Tui) drawSearch() {
 	display := ""
-	if t.model.searchOn {
-		display = getSpinner() + " " + t.model.input
-		t.search.ShowCursor = false
-	} else if t.model.peekState().active == search {
+	if t.model.peekState().active == search {
 		// redo this
 		t.search.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)
 		t.search.TitleStyle = ui.NewStyle(ui.ColorCyan)
@@ -127,7 +124,11 @@ func (t *Tui) drawSearch() {
 		t.search.TitleStyle = ui.NewStyle(ui.ColorWhite)
 		t.search.ShowCursor = false
 
-		display = "  " + t.model.input
+		if t.model.searchOn {
+			display = getSpinner() + " " + t.model.input
+		} else {
+			display = "  " + t.model.input
+		}
 	}
 
 	t.search.Text = display
@@ -135,11 +136,15 @@ func (t *Tui) drawSearch() {
 }
 
 func (t *Tui) drawFeeds() {
-	fd := t.model.getFeeds()
-	for i := range fd {
-		fd[i] = fmt.Sprintf("[%d] %s", i+1, fd[i])
+	feedNames, updating := t.model.getFeeds()
+	for i := range feedNames {
+		if updating[i] {
+			feedNames[i] = fmt.Sprintf("%s %s", getSpinner(), feedNames[i])
+		} else {
+			feedNames[i] = fmt.Sprintf("  %s", feedNames[i])
+		}
 	}
-	t.feeds.Rows = fd
+	t.feeds.Rows = feedNames
 	t.feeds.SelectedRow = t.model.feedSelected
 	if t.model.peekState().active == feeds {
 		t.feeds.Block.BorderStyle = ui.NewStyle(ui.ColorCyan)

@@ -10,6 +10,7 @@ import (
 
 type Feed struct {
 	mu          *sync.Mutex
+	updating    bool
 	FeedLink    string
 	Title       string
 	Link        string
@@ -29,13 +30,20 @@ func feedFromURL(url string) (*Feed, error) {
 
 	gf, err := fp.ParseURL(url)
 	if err != nil {
-		gf, err = fp.ParseURL(url + "/rss")
+		url += "/rss"
+		gf, err = fp.ParseURL(url)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return fromGofeed(gf), nil
+	feed := fromGofeed(gf)
+
+	if len(feed.FeedLink) == 0 {
+		feed.FeedLink = url
+	}
+
+	return feed, nil
 }
 
 func feedFromStr(s string) (*Feed, error) {
@@ -118,12 +126,14 @@ func (f *Feed) updateFrom(nf *Feed) {
 
 // get new items
 func (f *Feed) update() error {
+	f.updating = true
 	nf, err := feedFromURL(f.FeedLink)
 	if err != nil {
 		return err
 	}
 
 	f.updateFrom(nf)
+	f.updating = false
 	return nil
 }
 
