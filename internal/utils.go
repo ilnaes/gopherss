@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"os/exec"
+	"runtime"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -24,5 +26,12 @@ func htmlParse(s string) string {
 		case html.TextToken:
 			res = append(res, z.Text()...)
 		}
+	}
+}
+
+func openURL(s string) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("open", s)
+		cmd.Run()
 	}
 }

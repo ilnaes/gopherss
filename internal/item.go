@@ -16,6 +16,7 @@ type Item struct {
 	Save        bool
 	Read        bool
 	discard     bool
+	queued      bool
 }
 
 func itemFrom(gi *gofeed.Item) *Item {
@@ -60,6 +61,14 @@ func (it *Item) Discard() {
 func (it *Item) setSave() {
 	it.discard = false
 	it.Save = true
+}
+
+func (it *Item) queue() {
+	it.queued = true
+}
+
+func (it *Item) dequeue() {
+	it.queued = false
 }
 
 func (it *Item) getDescription() string {

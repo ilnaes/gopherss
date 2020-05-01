@@ -26,6 +26,7 @@ func handleSearch(k string, model *Client) {
 		model.popState()
 		go func() {
 			model.addFeed(model.input)
+			model.calculateAll()
 			model.searchOn = false
 			model.input = ""
 			model.cursor = 0
@@ -59,7 +60,9 @@ func handleList(k string, model *Client) {
 			*active = feeds
 		} else {
 			*active = items
+			model.Lock()
 			model.updateItem()
+			model.Unlock()
 		}
 	case "<Enter>":
 		if *active == items {
@@ -72,6 +75,11 @@ func handleList(k string, model *Client) {
 	case "d":
 		if *active == feeds {
 			model.removeFeed()
+			model.calculateAll()
+		}
+	case ";":
+		if *active == items {
+			model.openItem()
 		}
 	}
 }

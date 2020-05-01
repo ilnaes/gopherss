@@ -33,6 +33,7 @@ func Run(f string) {
 			f.mu = &sync.Mutex{}
 			cl.itemSelected = append(cl.itemSelected, 0)
 		}
+
 	}
 
 	t := Tui{

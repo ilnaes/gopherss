@@ -10,12 +10,12 @@ import (
 
 func getSpinner() string {
 	spins := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	return spins[time.Now().Nanosecond()/100000000]
+	return spins[time.Now().Nanosecond()/1e8]
 }
 
 type Tui struct {
 	model  *Client
-	items  *widgets.List
+	items  *StyleList
 	feeds  *widgets.List
 	box    *Textbox
 	search *Textbox
@@ -34,9 +34,8 @@ func (t *Tui) start() error {
 	tb.TextStyle = ui.NewStyle(7)
 	t.search = tb
 
-	l1 := widgets.NewList()
+	l1 := NewStyleList()
 	l1.Title = "Articles"
-	l1.TextStyle = ui.NewStyle(7)
 	l1.SelectedRowStyle = ui.NewStyle(15)
 	l1.WrapText = false
 	t.items = l1
@@ -157,11 +156,24 @@ func (t *Tui) drawFeeds() {
 }
 
 func (t *Tui) drawItemsList() {
-	itemList := t.model.getItems()
+	itemList, _ := t.model.getItems()
+	titleList := make([]string, 0)
+	styleList := make([]ui.Style, 0)
+
 	for i := range itemList {
-		itemList[i] = fmt.Sprintf("[%d] %s", i+1, itemList[i])
+		titleList = append(titleList, fmt.Sprintf("  %s", itemList[i].Title))
+
+		if itemList[i].Read {
+			styleList = append(styleList, ui.NewStyle(ui.ColorWhite))
+		} else {
+			styleList = append(styleList,
+				ui.NewStyle(ui.ColorGreen, ui.ColorClear, ui.ModifierBold))
+		}
 	}
-	t.items.Rows = itemList
+
+	t.items.Rows = titleList
+	t.items.TextStyle = styleList
+
 	if len(itemList) > 0 {
 		t.items.SelectedRow = t.model.itemSelected[t.model.feedSelected]
 	}

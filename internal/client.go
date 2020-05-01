@@ -2,7 +2,6 @@ package internal
 
 import (
 	"errors"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -32,6 +31,7 @@ type State struct {
 }
 
 type Client struct {
+	all          []*Item
 	Feeds        []*Feed
 	navStack     []State
 	feedSelected int
@@ -41,12 +41,13 @@ type Client struct {
 	searchOn     bool
 	item         *Item
 	boxTop       int
-	*sync.Mutex
+	*sync.Mutex  // protects Feeds, feedSelected, itemSelected
 }
 
 func newClient() Client {
 	return Client{
 		Feeds: make([]*Feed, 0),
+		all:   make([]*Item, 0),
 		navStack: []State{
 			{
 				route:  main,
@@ -59,21 +60,35 @@ func newClient() Client {
 	}
 }
 
+// should be called while holding lock
 func (c *Client) updateItem() {
 	var feed []*Item
+
 	if c.feedSelected > 0 {
 		feed = c.Feeds[c.feedSelected-1].Items
 	} else {
-		feed = c.getAll()
+		feed = c.all
 	}
 
 	if len(feed) > 0 {
 		c.item = feed[c.itemSelected[c.feedSelected]]
+		c.item.setRead()
 	}
 }
 
-func (c *Client) openBrowser() {
-	if runtime.GOOS == "darwin" {
+func (c *Client) calculateAll() {
+	c.Lock()
+	defer c.Unlock()
+
+	c.all = make([]*Item, 0)
+	for _, f := range c.Feeds {
+		c.all = mergeItems(c.all, f.Items, false)
+	}
+}
+
+func (c *Client) openItem() {
+	if c.item != nil {
+		openURL(c.item.Link)
 	}
 }
 
@@ -91,6 +106,7 @@ func (c *Client) scrollBoxDown() {
 func (c *Client) scrollListUp() {
 	c.Lock()
 	defer c.Unlock()
+
 	if c.peekState().active == items {
 		if c.itemSelected[c.feedSelected] > 0 {
 			c.itemSelected[c.feedSelected] -= 1
@@ -104,27 +120,14 @@ func (c *Client) scrollListUp() {
 	}
 }
 
-// get a merged list of all items
-// should be called while holding lock
-func (c *Client) getAll() []*Item {
-	items := make([]*Item, 0)
-
-	for _, f := range c.Feeds {
-		f.mu.Lock()
-		items = mergeItems(items, f.Items, false)
-		f.mu.Unlock()
-	}
-
-	return items
-}
-
 func (c *Client) scrollListDown() {
 	c.Lock()
 	defer c.Unlock()
+
 	if c.peekState().active == items {
 		var feed []*Item
 		if c.feedSelected == 0 {
-			feed = c.getAll()
+			feed = c.all
 		} else {
 			feed = c.Feeds[c.feedSelected-1].Items
 		}
@@ -145,6 +148,7 @@ func (c *Client) reload() {
 		for _, f := range c.Feeds {
 			go func(f *Feed) {
 				f.update()
+				c.calculateAll()
 			}(f)
 		}
 		c.Unlock()
@@ -174,29 +178,15 @@ func (c *Client) popState() (State, error) {
 	return res, nil
 }
 
-func (c *Client) getItems() []string {
-	res := make([]string, 0)
-	var items []*Item
-
+func (c *Client) getItems() ([]*Item, []*Feed) {
 	c.Lock()
 	defer c.Unlock()
 
 	if c.feedSelected == 0 {
-		items = c.getAll()
+		return c.all, nil
 	} else {
-		feed := c.Feeds[c.feedSelected-1]
-		items = feed.Items
-
-		feed.mu.Lock()
-		defer feed.mu.Unlock()
+		return c.Feeds[c.feedSelected-1].Items, nil
 	}
-
-	for _, i := range items {
-		res = append(res, i.Title+"  "+
-			strings.Replace(i.getDescription(), "\n", " ", -1))
-	}
-
-	return res
 }
 
 func (c *Client) getFeeds() ([]string, []bool) {
@@ -233,6 +223,8 @@ func (c *Client) removeFeed() {
 		c.feedSelected--
 	}
 
+	// reset all item selected index
+	c.itemSelected[0] = 0
 }
 
 func (c *Client) addFeed(url string) {
@@ -242,6 +234,8 @@ func (c *Client) addFeed(url string) {
 	}
 
 	c.Lock()
+	defer c.Unlock()
+
 	i := sort.Search(len(c.Feeds), func(i int) bool {
 		return strings.Compare(c.Feeds[i].Title, feed.Title) >= 0
 	})
@@ -261,5 +255,4 @@ func (c *Client) addFeed(url string) {
 			c.itemSelected[i] = 0
 		}
 	}
-	c.Unlock()
 }
