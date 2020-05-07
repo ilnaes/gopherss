@@ -161,7 +161,11 @@ func (t *Tui) drawItemsList() {
 	styleList := make([]ui.Style, 0)
 
 	for i := range itemList {
-		titleList = append(titleList, fmt.Sprintf("  %s", itemList[i].Title))
+		if itemList[i].queued {
+			titleList = append(titleList, fmt.Sprintf("* %s", itemList[i].Title))
+		} else {
+			titleList = append(titleList, fmt.Sprintf("  %s", itemList[i].Title))
+		}
 
 		if itemList[i].Read {
 			styleList = append(styleList, ui.NewStyle(ui.ColorWhite))

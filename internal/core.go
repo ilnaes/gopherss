@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"os/user"
 	"sync"
 )
@@ -43,10 +44,24 @@ func Run(f string) {
 	go cl.reload()
 	t.start()
 
+	queued := []string{}
+
 	for _, f := range cl.Feeds {
 		f.mu.Lock()
+
+		for _, i := range f.Items {
+			if i.queued {
+				queued = append(queued, i.Link)
+			}
+		}
+
 		f.prune()
 		f.mu.Unlock()
+	}
+
+	if len(queued) > 0 {
+		cmd := exec.Command("open", queued...)
+		_ = cmd.Run()
 	}
 
 	file, err := os.Create(def)

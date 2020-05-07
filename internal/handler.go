@@ -79,6 +79,10 @@ func handleList(k string, model *Client) {
 		}
 	case ";":
 		if *active == items {
+			model.queue()
+		}
+	case "o":
+		if *active == items {
 			model.openItem()
 		}
 	}

@@ -76,6 +76,14 @@ func (c *Client) updateItem() {
 	}
 }
 
+func (c *Client) queue() {
+	if c.item.queued {
+		c.item.dequeue()
+	} else {
+		c.item.queue()
+	}
+}
+
 func (c *Client) calculateAll() {
 	c.Lock()
 	defer c.Unlock()
